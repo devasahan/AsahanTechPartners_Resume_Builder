@@ -1,6 +1,6 @@
 /**
  * Facts bank: the only material the model may build bullets from. Taken from
- * Juan's own résumé and portfolio, tagged by employer. Add real facts here to
+ * Juan's own résumé, tagged by employer. Add real facts here to
  * give the builder more to work with; nothing outside this file can appear in
  * a generated bullet.
  */
