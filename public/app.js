@@ -22,6 +22,16 @@ function row(left, right) {
   return r;
 }
 
+/** Company and (editable) job title on the left, dates on the right. */
+function employerRow(employer, title) {
+  const r = el("div", "row");
+  const who = el("span", "who");
+  who.append(el("strong", "", employer.name));
+  if (title) who.append(el("span", "sep", " | "), el("span", "title editable", title));
+  r.append(who, el("span", "", employer.dates));
+  return r;
+}
+
 function section(title) {
   const s = el("section");
   s.append(el("h2", "", title));
@@ -48,7 +58,7 @@ function renderResume() {
 
   const exp = section("Professional Experience");
   for (const e of LOCKED.employers) {
-    exp.append(row(e.name, e.dates));
+    exp.append(employerRow(e, t?.titles?.[e.id]));
     const bullets = t?.bullets?.[e.id] ?? [];
     if (bullets.length) {
       const ul = el("ul");
@@ -80,6 +90,19 @@ function renderAnalysis(data, workflows) {
     for (const [value, label] of Object.entries(workflows)) $("workflow").add(new Option(label, value));
   }
   $("workflow").value = data.analysis.roleType;
+}
+
+/** Side panel: the title on record next to the one shown, so it's clear what was changed. */
+function renderTitles(t) {
+  const list = $("titles");
+  list.replaceChildren(
+    ...LOCKED.employers.map((e) => {
+      const shown = t.titles[e.id];
+      const li = el("li");
+      li.append(el("strong", "", `${e.name}: `), shown === e.recordTitle ? shown : `${shown} (on record: ${e.recordTitle})`);
+      return li;
+    }),
+  );
 }
 
 function renderMatch(match) {
@@ -145,9 +168,11 @@ async function tailor() {
   const t = await post("/api/tailor", { analysis: state.analysis, workflow: $("workflow").value });
   state.tailored = t;
   renderMatch(t.match);
-  $("dropped").textContent = t.dropped
-    ? `${t.dropped} generated line(s) were removed because they used details not in the facts bank.`
-    : "";
+  renderTitles(t);
+  const notes = [];
+  if (t.dropped) notes.push(`${t.dropped} generated line(s) were removed because they used details not in the facts bank.`);
+  if (t.titleResets.length) notes.push(`Kept the title on record for ${t.titleResets.join(", ")} (the suggestion broke the title rules).`);
+  $("dropped").textContent = notes.join(" ");
   renderResume();
   done(`Done. Workflow: ${t.workflow}.`);
 }

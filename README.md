@@ -3,7 +3,13 @@
 Paste a job description and get a one-page resume tailored to it, plus a match score and keyword gaps.
 The header, employers, dates and education are locked (`public/locked.js`); the summary, skills and bullets are
 written by Claude using only the facts in `public/facts.js`. Any bullet with a number or tool that is not in that
-file is dropped. Add real facts there (Bottle Rocket has none yet) to get more content.
+file is dropped. Add real facts there to get more content.
+
+For each job, the builder also suggests a job title per company and opens the summary with the job's own title
+(for example "Generative AI Engineer"). Suggested titles stay at the same level as the title on your records
+(`recordTitle` in `public/locked.js`), never add Senior, Lead or Principal, and use AI wording only where that
+company's facts show AI work. The side panel lists each title next to the one on record, so you can decide what to
+send. You can also edit any title in the preview.
 
 ## First-time setup (Windows)
 

@@ -8,7 +8,7 @@
  */
 import Anthropic from "@anthropic-ai/sdk";
 import { FACTS, PROFILE, SKILLS } from "../public/facts.js";
-import { sanitizeTailor, scoreMatch } from "../public/guard.js";
+import { headlineFrom, sanitizeTailor, scoreMatch } from "../public/guard.js";
 import { LOCKED } from "../public/locked.js";
 import { ROLE_TYPES, WORKFLOWS } from "../public/workflows.js";
 
@@ -60,9 +60,15 @@ const ANALYSIS_SCHEMA = {
 const TAILOR_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["summary", "skillOrder", "bullets"],
+  required: ["summary", "titles", "skillOrder", "bullets"],
   properties: {
     summary: str,
+    titles: {
+      type: "object",
+      additionalProperties: false,
+      required: LOCKED.employers.map((e) => e.id),
+      properties: Object.fromEntries(LOCKED.employers.map((e) => [e.id, str])),
+    },
     skillOrder: strList,
     bullets: {
       type: "object",
@@ -104,27 +110,38 @@ const describeWorkflows = () => Object.fromEntries(ROLE_TYPES.map((k) => [k, WOR
 export async function tailor({ analysis, workflow }) {
   if (!analysis?.keywords) throw new HttpError(400, "Missing analysis.");
   const wf = WORKFLOWS[workflow] ?? WORKFLOWS[analysis.roleType] ?? WORKFLOWS["backend-platform"];
+  const headline = headlineFrom(analysis.roleTitle, wf.label);
+  const records = Object.fromEntries(LOCKED.employers.map((e) => [e.id, e.recordTitle]));
   const system =
     "You write one-page resume content for Juan Daniel Ramirez, tailored to a job. STRICT RULES: " +
-    "use ONLY the facts provided for each employer; never invent employers, titles, numbers, tools, or outcomes; " +
+    "use ONLY the facts provided for each employer; never invent employers, numbers, tools, or outcomes; " +
     "never move a fact to a different employer; write 2-4 concise, achievement-oriented bullets per employer (start with a strong verb, no first person), " +
     "and return an empty list for an employer that has no facts. Work in terms the job description uses when the facts genuinely support them. " +
-    "The summary is 2 sentences, may use only these overall facts: " +
-    `${PROFILE.years} years, ${PROFILE.headline}, industries: ${PROFILE.industries.join(", ")}. ` +
+    `The summary must start with exactly "${headline}" (the target job's title) and then, in 1-2 sentences, ` +
+    `may use only these overall facts: ${PROFILE.years} years of experience; strengths: ${PROFILE.strengths.join("; ")}; ` +
+    `industries: ${PROFILE.industries.join(", ")}. Do not name any other job title in the summary. ` +
+    "`titles` gives, for each employer, the job title that best fits the target job while truthfully describing the work in that employer's facts. " +
+    "Title rules: 2-6 words; the same career level as the title on record (never add Senior, Lead, Principal, Staff, Manager, Director or similar); " +
+    "use the job's own wording (for example 'Generative AI Engineer') only where that employer's facts show that kind of work, " +
+    "so an employer with no AI work gets a software engineering title; keep '(Part-Time)' where the record has it. " +
     "`skillOrder` lists skills from the allowed list only, most relevant to the job first (at most 24). " +
     `Emphasis for this role: ${wf.emphasis}`;
   const user =
     `<job_analysis>\n${JSON.stringify(analysis)}\n</job_analysis>\n` +
+    `<titles_on_record>\n${JSON.stringify(records)}\n</titles_on_record>\n` +
     `<facts_by_employer>\n${JSON.stringify(FACTS)}\n</facts_by_employer>\n` +
     `<allowed_skills>\n${JSON.stringify(SKILLS)}\n</allowed_skills>`;
 
-  let { result, violations } = sanitizeTailor(await ask(system, user, TAILOR_SCHEMA));
+  let { result, violations } = sanitizeTailor(await ask(system, user, TAILOR_SCHEMA), { headline });
   if (violations.length) {
     // One retry that tells the model exactly what it got wrong.
     const feedback = `${user}\n<fix>\nYour previous draft broke the rules: ${JSON.stringify(violations)}. Rewrite using only the facts.\n</fix>`;
-    ({ result, violations } = sanitizeTailor(await ask(system, feedback, TAILOR_SCHEMA)));
+    ({ result, violations } = sanitizeTailor(await ask(system, feedback, TAILOR_SCHEMA), { headline }));
   }
-  return { ...result, dropped: violations.length, workflow: wf.label, match: scoreMatch(analysis.keywords) };
+  const names = Object.fromEntries(LOCKED.employers.map((e) => [e.id, e.name]));
+  const titleResets = violations.filter((v) => v.kind === "title").map((v) => names[v.employer]);
+  const dropped = violations.length - titleResets.length;
+  return { ...result, headline, titleResets, dropped, workflow: wf.label, match: scoreMatch(analysis.keywords) };
 }
 
 class HttpError extends Error {
