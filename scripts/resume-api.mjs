@@ -60,7 +60,7 @@ const ANALYSIS_SCHEMA = {
 const TAILOR_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["summary", "titles", "skillOrder", "bullets"],
+  required: ["summary", "focus", "titles", "skillOrder", "bullets"],
   properties: {
     summary: str,
     titles: {
@@ -69,6 +69,7 @@ const TAILOR_SCHEMA = {
       required: LOCKED.employers.map((e) => e.id),
       properties: Object.fromEntries(LOCKED.employers.map((e) => [e.id, str])),
     },
+    focus: strList,
     skillOrder: strList,
     bullets: {
       type: "object",
@@ -124,6 +125,7 @@ export async function tailor({ analysis, workflow }) {
     "Title rules: 2-6 words; the same career level as the title on record (never add Senior, Lead, Principal, Staff, Manager, Director or similar); " +
     "use the job's own wording (for example 'Generative AI Engineer') only where that employer's facts show that kind of work, " +
     "so an employer with no AI work gets a software engineering title; keep '(Part-Time)' where the record has it. " +
+    "`focus` lists the 3 skills from the allowed list that best show fit for this job; they go in the headline under his name. " +
     "`skillOrder` lists skills from the allowed list only, most relevant to the job first (at most 24). " +
     `Emphasis for this role: ${wf.emphasis}`;
   const user =

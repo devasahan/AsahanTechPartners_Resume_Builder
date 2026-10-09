@@ -56,6 +56,13 @@ test("sanitize drops bad bullets, ignores locked fields, filters skills", () => 
   assert.equal(violations.length, 2);
   assert.equal(result.name, undefined);
   assert.deepEqual(result.titles, TITLES);
+  assert.deepEqual(result.focus, ["Python"], "falls back to the top skills when focus is missing");
+});
+
+test("headline skills come only from the allowed list, at most three", () => {
+  const pick = (focus) => sanitizeTailor({ summary: "", focus, titles: TITLES, skillOrder: ["Python", "SQL", "AWS"], bullets: {} }).result.focus;
+  assert.deepEqual(pick(["hybrid rag", "LLM evals", "Multi-agent systems", "Guardrails"]), ["Hybrid RAG", "LLM evals", "Multi-agent systems"]);
+  assert.deepEqual(pick(["Prompt wizardry", "Hybrid RAG"]), ["Python", "SQL", "AWS"]);
 });
 
 test("numbers must match whole values, not pieces of other numbers", () => {

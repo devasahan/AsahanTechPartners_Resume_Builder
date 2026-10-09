@@ -99,7 +99,7 @@ const opensWith = (summary, headline) => summary.toLowerCase().startsWith(headli
  * - bullets that fail are dropped; employers without facts get none
  * - a title that breaks the rules falls back to the title on record
  * - the summary must open with `headline`; if it doesn't, it is prefixed with it
- * - skills are limited to SKILLS (case-normalised, de-duplicated)
+ * - skills and the 3 headline skills (`focus`) are limited to SKILLS (case-normalised, de-duplicated)
  * - locked fields (company names, dates, education) are never read from the model
  */
 export function sanitizeTailor(raw, { headline } = {}) {
@@ -132,8 +132,12 @@ export function sanitizeTailor(raw, { headline } = {}) {
   }
 
   const byLower = new Map(SKILLS.map((s) => [s.toLowerCase(), s]));
-  const skills = [...new Set((raw.skillOrder || []).map((s) => byLower.get(String(s).toLowerCase())).filter(Boolean))];
-  return { result: { summary, skills, bullets, titles }, violations };
+  const allowed = (list) => [...new Set((list || []).map((s) => byLower.get(String(s).toLowerCase())).filter(Boolean))];
+  const skills = allowed(raw.skillOrder);
+  // Headline skills: only from the allowed list; top skills if the model gave fewer than two.
+  const picked = allowed(raw.focus).slice(0, 3);
+  const focus = picked.length >= 2 ? picked : skills.slice(0, 3);
+  return { result: { summary, focus, skills, bullets, titles }, violations };
 }
 
 /** Deterministic coverage of JD keywords against the facts bank + skills. */

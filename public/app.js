@@ -43,7 +43,13 @@ function renderResume() {
   const t = state.tailored;
   const root = $("resume");
   root.replaceChildren();
-  root.append(el("h1", "", LOCKED.name.toUpperCase()), el("p", "contact", LOCKED.contact.join(" | ")));
+  root.append(el("h1", "", LOCKED.name.toUpperCase()));
+  if (t?.headline) {
+    // Headline under the name: the job's title, then the skills that best show fit.
+    const focus = t.focus?.length ? ` | ${t.focus.join(" · ")}` : "";
+    root.append(el("p", "headline editable", `${t.headline}${focus}`));
+  }
+  root.append(el("p", "contact", LOCKED.contact.join(" | ")));
 
   if (t?.summary) {
     const s = section("Summary");
