@@ -8,12 +8,12 @@
 import { exec } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { createServer } from "node:http";
-import { extname, join, normalize, sep } from "node:path";
+import { basename, extname, join, normalize, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadEnv } from "./load-env.mjs";
 import { config, handleApi, NO_KEY } from "./resume-api.mjs";
 
-const fromEnvFile = loadEnv();
+const env = loadEnv();
 const PUBLIC = fileURLToPath(new URL("../public", import.meta.url));
 const START_PORT = Number(process.env.PORT) || 3000;
 const TYPES = {
@@ -69,11 +69,16 @@ server.once("listening", () => {
   const port = server.address().port;
   const address = `http://localhost:${port}`;
   const { model, keySet } = config();
-  const source = fromEnvFile.has("ANTHROPIC_API_KEY") ? ".env file" : "environment";
+  const envFile = env.file && basename(env.file);
+  const key = process.env.ANTHROPIC_API_KEY;
   console.log(`\n  Resume builder running at ${address}`);
   if (port !== START_PORT) console.log(`  (port ${START_PORT} was busy: is another copy running in a different window?)`);
   console.log(`  Model:   ${model}`);
-  console.log(keySet ? `  API key: found (${source})` : `  API key: MISSING. ${NO_KEY}`);
+  if (!keySet && envFile) console.log(`  API key: MISSING. ${envFile} has no key: paste it after ANTHROPIC_API_KEY=, save, and restart.`);
+  else if (!keySet) console.log(`  API key: MISSING. ${NO_KEY}`);
+  else console.log(`  API key: found (${env.applied.has("ANTHROPIC_API_KEY") ? `${envFile} file` : "environment"})`);
+  if (key && !key.startsWith("sk-ant-"))
+    console.log("  Warning: that key doesn't look like a Claude API key (those start with sk-ant-). Check what was pasted.");
   console.log("\n  Keep this window open while you use the page. Press Ctrl+C to stop.\n");
   openBrowser(address);
 });

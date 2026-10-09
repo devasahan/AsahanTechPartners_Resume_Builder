@@ -17,7 +17,8 @@ notepad .env
 ```
 
 In Notepad, paste your key after `ANTHROPIC_API_KEY=` and save. You only do this once; never share the key or
-paste it into a chat.
+paste it into a chat. A file that Windows saved as `.env.txt`, or one holding just the key on its own line, works
+too, as long as it is in the project folder.
 
 ## Start it
 

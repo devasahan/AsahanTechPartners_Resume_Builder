@@ -24,10 +24,29 @@ test(".env values win over stale ones, empty values are skipped", () => {
   writeFileSync(file, "TEST_KEY_A=new\nTEST_KEY_B=\n");
   process.env.TEST_KEY_A = "old";
   process.env.TEST_KEY_B = "kept";
-  assert.deepEqual([...loadEnv(file)], ["TEST_KEY_A"]);
+  assert.deepEqual([...loadEnv([file]).applied], ["TEST_KEY_A"]);
   assert.equal(process.env.TEST_KEY_A, "new");
   assert.equal(process.env.TEST_KEY_B, "kept");
-  assert.deepEqual([...loadEnv(join(file, "missing"))], []);
+  assert.deepEqual(loadEnv([join(file, "missing")]), { file: null, applied: new Set() });
+});
+
+test("a key pasted on its own line counts, but ANTHROPIC_API_KEY= wins", () => {
+  assert.deepEqual(parseEnv("sk-ant-usr-abc_DEF-123\r\n"), { ANTHROPIC_API_KEY: "sk-ant-usr-abc_DEF-123" });
+  assert.deepEqual(parseEnv("ANTHROPIC_API_KEY=\r\nsk-ant-bare\r\n"), { ANTHROPIC_API_KEY: "sk-ant-bare" });
+  assert.equal(parseEnv("ANTHROPIC_API_KEY=sk-ant-line\nsk-ant-bare").ANTHROPIC_API_KEY, "sk-ant-line");
+  assert.deepEqual(parseEnv("not a key\nsk-ant- has spaces"), {});
+});
+
+test("reads .env.txt when Windows added the extension, preferring .env", () => {
+  const dir = mkdtempSync(join(tmpdir(), "env-"));
+  const files = [join(dir, ".env"), join(dir, ".env.txt")];
+  writeFileSync(files[1], "\uFEFFsk-ant-from-txt\r\n");
+  const fromTxt = loadEnv(files);
+  assert.equal(fromTxt.file, files[1]);
+  assert.equal(process.env.ANTHROPIC_API_KEY, "sk-ant-from-txt");
+  writeFileSync(files[0], Buffer.from("\uFEFFANTHROPIC_API_KEY=sk-ant-utf16\r\n", "utf16le"));
+  assert.equal(loadEnv(files).file, files[0]);
+  assert.equal(process.env.ANTHROPIC_API_KEY, "sk-ant-utf16");
 });
 
 test("API errors become messages that say what to do", () => {
