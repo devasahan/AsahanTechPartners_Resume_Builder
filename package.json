@@ -1,0 +1,14 @@
+{
+  "name": "asahantechpartners-resume-builder",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Job-description-tailored resume builder",
+  "scripts": {
+    "dev": "node scripts/server.mjs",
+    "start": "node scripts/server.mjs",
+    "test": "node --test tests/*.test.mjs"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": { "@anthropic-ai/sdk": "^0.132.1" }
+}

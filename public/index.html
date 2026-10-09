@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Resume Builder</title>
+    <meta name="robots" content="noindex" />
+    
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <aside class="panel" aria-label="Job description and analysis">
+        <h1>Resume Builder</h1>
+        <p class="hint">Paste a job description. The header, employers, dates and education stay exactly as in the draft; only the summary, skills and bullets are tailored, using facts from the portfolio.</p>
+
+        <label for="jd">Job description</label>
+        <textarea id="jd" rows="12" placeholder="Paste the full job description here…"></textarea>
+        <button id="build" type="button">Analyze &amp; build resume</button>
+        <p id="status" role="status" aria-live="polite"></p>
+
+        <section id="analysis" hidden>
+          <h2 id="role-title"></h2>
+          <div class="score"><span id="score">0</span><small>% match</small></div>
+          <label for="workflow">Career workflow</label>
+          <select id="workflow"></select>
+          <h3>Must-haves</h3>
+          <ul id="must"></ul>
+          <h3>Covered keywords</h3>
+          <p id="covered" class="chips"></p>
+          <h3>Gaps (not added to the resume)</h3>
+          <p id="gaps" class="chips gaps"></p>
+          <div class="actions">
+            <button id="print" type="button">Download PDF</button>
+            <button id="copy" type="button" class="secondary">Copy as text</button>
+          </div>
+          <p id="dropped" class="hint"></p>
+        </section>
+      </aside>
+
+      <article id="resume" class="sheet" aria-label="Resume preview"></article>
+    </main>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
