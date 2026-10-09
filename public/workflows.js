@@ -1,37 +1,33 @@
 /**
- * Career workflows: one per role type. The analyzer picks the best fit; each
- * workflow steers emphasis (what to lead with, what to prefer in bullets).
+ * Career workflows: one per role type. The analyzer picks the best fit and the
+ * user can override it; each one steers emphasis (what to lead with) without
+ * ever adding facts that aren't in the uploaded draft.
  */
 export const WORKFLOWS = {
   "ai-llm": {
     label: "AI / LLM engineer",
     emphasis:
-      "Lead with production LLM systems: RAG, agents, evals, guardrails, LLMOps. Prefer Lindy and Acquire.com facts; use backend facts as supporting evidence of production rigor.",
-    skillFocus: ["AI & LLMs", "Retrieval & LLMOps", "Languages & frameworks"],
+      "Lead with production LLM systems where the draft shows them: RAG, agents, evaluation, guardrails, LLMOps. Put the most relevant experience first and keep supporting backend work as evidence of production rigor.",
   },
   "backend-platform": {
     label: "Backend / platform engineer",
     emphasis:
-      "Lead with APIs, microservices, messaging, scale, reliability, performance tuning, cloud and CI/CD. Prefer Q2 Holdings and Orbital facts.",
-    skillFocus: ["Languages & frameworks", "Databases & messaging", "Cloud & DevOps"],
+      "Lead with APIs, microservices, messaging, scale, reliability, performance tuning, cloud and CI/CD, wherever the draft shows them.",
   },
   "data-engineering": {
     label: "Data engineer",
     emphasis:
-      "Lead with ETL/ELT pipelines, scheduling, data quality, reporting models, and automation. Prefer Orbital Education facts, then pipeline-related Lindy and Q2 facts.",
-    skillFocus: ["Databases & messaging", "Languages & frameworks", "Cloud & DevOps"],
+      "Lead with ETL/ELT pipelines, scheduling, data quality, reporting models and automation, wherever the draft shows them.",
   },
   "full-stack": {
     label: "Full-stack engineer",
     emphasis:
-      "Lead with end-to-end delivery: React/TypeScript front ends, Node/Python APIs, and the user-facing scale of the banking platform. Be honest that backend is the stronger side.",
-    skillFocus: ["Languages & frameworks", "Databases & messaging", "Cloud & DevOps"],
+      "Lead with end-to-end delivery: front ends, APIs and the user-facing scale of the work. Be honest about which side the draft shows more of.",
   },
   "regulated-domain": {
     label: "Healthcare / FinTech / regulated systems",
     emphasis:
-      "Lead with security and compliance: HIPAA, OAuth 2.0, audit logging, PII redaction, regulated platforms. Prefer Lindy and Q2 Holdings facts.",
-    skillFocus: ["Security & compliance", "Languages & frameworks", "AI & LLMs"],
+      "Lead with security and compliance: regulated platforms, access control, audit logging, privacy, wherever the draft shows them.",
   },
 };
 

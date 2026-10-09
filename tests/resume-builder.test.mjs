@@ -1,103 +1,84 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { checkBullet, checkTitle, headlineFrom, sanitizeTailor, scoreMatch } from "../public/guard.js";
-import { LOCKED } from "../public/locked.js";
+import { checkBullet, checkSummary, checkTitle, headlineFrom, resumeText, sanitizeTailor, scoreMatch } from "../public/guard.js";
+import { normalizeProfile, yearsExperience } from "../public/profile.js";
 
-test("locked fields match the draft resume", () => {
-  assert.deepEqual(
-    LOCKED.employers.map((e) => [e.name, e.dates]),
-    [
-      ["Lindy", "Feb 2025 – Present"],
-      ["Acquire.com", "Jul 2024 – Feb 2025"],
-      ["Orbital Education", "Jun 2021 – Jun 2024"],
-      ["Q2 Holdings", "May 2020 – May 2021"],
-      ["Bottle Rocket", "Mar 2019 – May 2020"],
-    ],
-  );
-  assert.deepEqual(LOCKED.education, [{ name: "Fontbonne University", dates: "Aug 2016 – May 2020" }]);
-});
-
-test("grounded bullet passes", () => {
-  assert.deepEqual(checkBullet("Cut clinician documentation time by 30–40% with LangGraph agents.", "lindy"), []);
-});
-
-test("invented metric and tool are rejected", () => {
-  const p = checkBullet("Reduced latency 80% using Kubernetes.", "q2");
-  assert.equal(p.length, 2);
-});
-
-test("a fact cannot move to another employer", () => {
-  assert.ok(checkBullet("Served 500K+ users.", "lindy").length > 0);
-});
-
-const TITLES = {
-  lindy: "Generative AI Engineer",
-  acquire: "AI Engineer",
-  orbital: "AI Engineer",
-  q2: "Backend Software Engineer",
-  bottlerocket: "Software Engineer (Part-Time)",
-};
-const employer = (id) => LOCKED.employers.find((e) => e.id === id);
-
-test("sanitize drops bad bullets, ignores locked fields, filters skills", () => {
-  const { result, violations } = sanitizeTailor({
-    summary: "Engineer with 7+ years.",
-    titles: TITLES,
-    skillOrder: ["python", "COBOL", "Python"],
-    bullets: {
-      lindy: ["Cut documentation time by 30–40%.", "Saved $2M."],
-      bottlerocket: ["Deployed services on Kubernetes."],
-      name: "Hacker",
+// A sample draft: one company with real content, one with only a name and dates (the AI drafts those), one part-time.
+const profile = normalizeProfile({
+  name: "Sam Rivera",
+  contact: ["Austin, Texas", "sam@example.com"],
+  employers: [
+    {
+      name: "Acme Health",
+      dates: "Feb 2023 – Present",
+      title: "Applied AI Engineer",
+      bullets: [
+        "Built a retrieval-augmented generation service on PostgreSQL and pgvector serving 5,000+ clinicians.",
+        "Cut documentation time by 30–40% with LangGraph agents.",
+      ],
+      tech: ["Python", "LangGraph"],
     },
-  });
-  assert.deepEqual(result.skills, ["Python"]);
-  assert.equal(result.bullets.lindy.length, 1);
-  assert.equal(result.bullets.bottlerocket.length, 0);
-  assert.equal(violations.length, 2);
-  assert.equal(result.name, undefined);
-  assert.deepEqual(result.titles, TITLES);
-  assert.deepEqual(result.focus, ["Python"], "falls back to the top skills when focus is missing");
+    { name: "Northwind Bank", dates: "May 2019 – Jan 2023", title: "", bullets: [], tech: [] },
+    { name: "Pixel Studio", dates: "Mar 2017 – Apr 2019", title: "Software Engineer (Part-Time)", bullets: [], tech: [] },
+  ],
+  education: [{ name: "State University", dates: "2013 – 2017", detail: "B.S. Computer Science" }],
+  skills: ["Python", "PostgreSQL", "LangGraph"],
+});
+const [acme, bank, pixel] = profile.employers;
+
+test("profiles are trimmed, numbered and capped", () => {
+  assert.deepEqual(profile.employers.map((e) => e.id), ["e0", "e1", "e2"]);
+  const messy = normalizeProfile({ name: "  A   B ", employers: [{ name: "" }, { name: " X ", bullets: ["a", "a", " "] }], skills: ["Go", "go"] });
+  assert.equal(messy.name, "A B");
+  assert.equal(messy.employers.length, 1);
+  assert.deepEqual(messy.employers[0].bullets, ["a"]);
+  assert.deepEqual(messy.skills, ["Go"]);
+  assert.equal(normalizeProfile(null).name, "");
 });
 
-test("headline skills come only from the allowed list, at most three", () => {
-  const pick = (focus) => sanitizeTailor({ summary: "", focus, titles: TITLES, skillOrder: ["Python", "SQL", "AWS"], bullets: {} }).result.focus;
-  assert.deepEqual(pick(["hybrid rag", "LLM evals", "Multi-agent systems", "Guardrails"]), ["Hybrid RAG", "LLM evals", "Multi-agent systems"]);
-  assert.deepEqual(pick(["Prompt wizardry", "Hybrid RAG"]), ["Python", "SQL", "AWS"]);
+test("years of experience come from the earliest employment year", () => {
+  assert.equal(yearsExperience(profile, new Date("2026-10-09")), 9);
+  assert.equal(yearsExperience(normalizeProfile({ name: "A", employers: [{ name: "X", dates: "" }] })), 0);
 });
 
-test("numbers must match whole values, not pieces of other numbers", () => {
-  assert.ok(checkBullet("Cut reporting effort by 30% at Orbital.", "orbital").length > 0);
-  assert.deepEqual(checkBullet("Processed about 30K records nightly.", "orbital"), []);
-  assert.deepEqual(checkBullet("Processed about 30,000 records nightly.", "orbital"), []);
-  assert.deepEqual(checkBullet("Served 500,000+ users.", "q2"), []);
-  assert.ok(checkBullet("Served 50,000 users.", "q2").length > 0);
+test("rewritten bullets may not add numbers or tools the draft lacks", () => {
+  assert.deepEqual(checkBullet("Cut documentation time by 30–40% using LangGraph agents.", acme), []);
+  assert.deepEqual(checkBullet("Served more than 5000 clinicians with a PostgreSQL retrieval service.", acme), []);
+  assert.ok(checkBullet("Cut documentation time by 70% using LangGraph agents.", acme).length > 0);
+  assert.ok(checkBullet("Deployed the retrieval service on Kubernetes for all clinicians.", acme).length > 0);
+  assert.deepEqual(checkBullet("Cut reporting effort by 30% using LangGraph agents.", acme), [], "30 is in the draft as part of 30–40%");
+  assert.ok(checkBullet("Served 50 clinicians with a retrieval-augmented service.", acme).length > 0, "50 is not 5,000");
 });
 
-test("titles may follow the job but never rise above the record", () => {
-  assert.deepEqual(checkTitle("Generative AI Engineer", employer("lindy")), []);
-  assert.deepEqual(checkTitle("Backend Software Engineer", employer("q2")), []);
-  assert.ok(checkTitle("Senior AI Engineer", employer("lindy")).length > 0);
-  assert.ok(checkTitle("Principal Software Engineer", employer("q2")).length > 0);
-  assert.ok(checkTitle("Engineering Manager", employer("orbital")).length > 0);
-  assert.ok(checkTitle("AI Engineer", employer("q2")).length > 0, "no AI title where the facts have no AI work");
-  assert.ok(checkTitle("Machine Learning Engineer", employer("bottlerocket")).length > 0);
-  assert.ok(checkTitle("Frontend Engineer", employer("bottlerocket")).length > 0, "must stay part-time");
-  assert.deepEqual(checkTitle("Frontend Engineer (Part-Time)", employer("bottlerocket")), []);
-  assert.ok(checkTitle("Engineer", employer("lindy")).length > 0);
-  assert.ok(checkTitle("AI Engineer 3", employer("lindy")).length > 0);
+test("numbers match whole values, not pieces of other numbers", () => {
+  const p = normalizeProfile({ name: "A", employers: [{ name: "X", dates: "2020", bullets: ["Processed about 30,000 records nightly."] }] });
+  const e = p.employers[0];
+  assert.deepEqual(checkBullet("Processed about 30K records every night for reporting.", e), []);
+  assert.deepEqual(checkBullet("Processed about 30000 records every night for reporting.", e), []);
+  assert.ok(checkBullet("Cut reporting effort by 30% with nightly processing jobs.", e).length > 0);
 });
 
-test("a rejected title falls back to the title on record and is reported", () => {
-  const { result, violations } = sanitizeTailor({
-    summary: "",
-    titles: { ...TITLES, q2: "AI Engineer", lindy: "Lead AI Architect" },
-    skillOrder: [],
-    bullets: {},
-  });
-  assert.equal(result.titles.q2, "Software Engineer");
-  assert.equal(result.titles.lindy, "Applied AI Engineer");
-  assert.equal(result.titles.acquire, "AI Engineer");
-  assert.deepEqual(violations.filter((v) => v.kind === "title").map((v) => v.employer).sort(), ["lindy", "q2"]);
+test("AI-drafted lines (no draft bullets) may not contain numbers, tools, or leadership claims", () => {
+  assert.deepEqual(checkBullet("Built and maintained backend services supporting digital banking products.", bank), []);
+  assert.ok(checkBullet("Built backend services for 500,000 banking customers every day.", bank).length > 0);
+  assert.ok(checkBullet("Built backend services on AWS supporting digital banking products.", bank).length > 0);
+  assert.ok(checkBullet("Led a team building backend services for digital banking products.", bank).length > 0);
+  assert.ok(checkBullet("Won an award for backend services supporting banking products.", bank).length > 0);
+  assert.ok(checkBullet("Built services.", bank).length > 0, "too short");
+});
+
+test("titles may follow the job but never rise above the draft", () => {
+  assert.deepEqual(checkTitle("Generative AI Engineer", acme), []);
+  assert.ok(checkTitle("Senior Applied AI Engineer", acme).length > 0);
+  assert.ok(checkTitle("Principal Software Engineer", bank).length > 0, "no level words when the draft has no title");
+  assert.deepEqual(checkTitle("Backend Software Engineer", bank), []);
+  assert.deepEqual(checkTitle("Machine Learning Engineer", bank), [], "AI wording allowed when the draft shows nothing");
+  assert.ok(checkTitle("Frontend Engineer", pixel).length > 0, "must stay part-time");
+  assert.deepEqual(checkTitle("Frontend Engineer (Part-Time)", pixel), []);
+  assert.ok(checkTitle("Engineer", acme).length > 0);
+  assert.ok(checkTitle("AI Engineer 3", acme).length > 0);
+  const plain = normalizeProfile({ name: "A", employers: [{ name: "X", title: "Software Engineer", bullets: ["Built REST APIs for payments."] }] }).employers[0];
+  assert.ok(checkTitle("AI Engineer", plain).length > 0, "no AI title where the draft shows no AI work");
 });
 
 test("the headline is the job's title without levels above senior or location tails", () => {
@@ -110,28 +91,88 @@ test("the headline is the job's title without levels above senior or location ta
   assert.equal(headlineFrom("", fallback), fallback);
 });
 
-test("the summary must open with the job's title and not claim a higher level", () => {
-  const raw = (summary) => ({ summary, titles: TITLES, skillOrder: [], bullets: {} });
-  const headline = "Generative AI Engineer";
-  const ok = sanitizeTailor(raw("Generative AI Engineer with 7+ years of experience building production LLM systems."), { headline });
-  assert.equal(ok.violations.length, 0);
-  assert.match(ok.result.summary, /^Generative AI Engineer with 7\+ years/);
-
-  const old = sanitizeTailor(raw("Senior Software Engineer with 7+ years of experience."), { headline });
-  assert.equal(old.violations.length, 1);
-  assert.equal(old.result.summary, "Generative AI Engineer: Senior Software Engineer with 7+ years of experience.");
-
-  const inflated = sanitizeTailor(raw("Generative AI Engineer and Principal Engineer with 12 years of experience."), { headline });
-  assert.equal(inflated.result.summary, "");
-  assert.ok(inflated.violations[0].problems.length >= 2);
+test("the summary uses only years, numbers and tools the draft shows, and may not claim seniority", () => {
+  assert.deepEqual(checkSummary("Generative AI Engineer with 9+ years of experience in Python and PostgreSQL.", profile, 9), []);
+  assert.ok(checkSummary("Generative AI Engineer with 12+ years of experience.", profile, 9).length > 0);
+  assert.ok(checkSummary("Generative AI Engineer experienced with Kubernetes.", profile, 9).length > 0);
+  assert.ok(checkSummary("Generative AI Engineer and Principal Engineer.", profile, 9).length > 0);
 });
 
-test("match score is weighted and lists gaps", () => {
-  const m = scoreMatch([
-    { term: "Python", required: true },
-    { term: "Rust", required: true },
-    { term: "RAG", required: false },
-  ]);
+const good = () => ({
+  summary: "Generative AI Engineer with 9+ years of experience building production retrieval systems in Python.",
+  focus: ["python", "LangGraph", "Hybrid RAG"],
+  skillOrder: ["LangGraph", "Python"],
+  titles: { e0: "Generative AI Engineer", e1: "Backend Software Engineer", e2: "Software Engineer (Part-Time)" },
+  bullets: {
+    e0: ["Built a retrieval-augmented generation service on PostgreSQL and pgvector for 5,000+ clinicians."],
+    e1: ["Built and maintained backend services supporting digital banking products."],
+    e2: ["Developed and maintained web applications for client projects."],
+  },
+});
+
+test("sanitize keeps good output and flags what the AI wrote without facts", () => {
+  const { result, violations } = sanitizeTailor(good(), profile, { headline: "Generative AI Engineer", years: 9 });
+  assert.equal(violations.length, 0);
+  assert.deepEqual(result.ai.bullets, { e0: false, e1: true, e2: true });
+  assert.deepEqual(result.ai.titles, { e0: false, e1: true, e2: false }, "only a title with no draft counterpart is an AI suggestion");
+  assert.equal(result.ai.skills, false);
+  assert.deepEqual(result.skills, ["LangGraph", "Python", "PostgreSQL"], "draft skills are never lost");
+  assert.deepEqual(result.focus, ["Python", "LangGraph"]);
+});
+
+test("sanitize drops bad lines, resets bad titles, and ignores locked fields from the model", () => {
+  const raw = good();
+  raw.bullets.e0 = ["Cut documentation time by 70% using LangGraph agents.", "Built a retrieval-augmented generation service on PostgreSQL and pgvector for 5,000+ clinicians."];
+  raw.bullets.e1 = ["Led a team of eight building backend services for digital banking products."];
+  raw.titles.e0 = "Principal AI Architect";
+  raw.titles.e1 = "Staff Software Engineer";
+  raw.name = "Hacker";
+  raw.employers = [{ name: "Evil Corp" }];
+  const { result, violations } = sanitizeTailor(raw, profile, { headline: "Generative AI Engineer", years: 9 });
+  assert.equal(result.bullets.e0.length, 1);
+  assert.deepEqual(result.bullets.e1, [], "AI draft with a leadership claim is dropped");
+  assert.equal(result.titles.e0, "Applied AI Engineer", "falls back to the draft title");
+  assert.equal(result.titles.e1, "", "no draft title and a bad suggestion: no title");
+  assert.equal(result.ai.titles.e1, false);
+  assert.equal(violations.filter((v) => v.kind === "title").length, 2);
+  assert.equal(result.name, undefined);
+  assert.equal(result.employers, undefined);
+});
+
+test("if every rewritten line is dropped, the draft's own bullets are kept", () => {
+  const raw = good();
+  raw.bullets.e0 = ["Cut documentation time by 99% using LangGraph agents and Kubernetes."];
+  const { result } = sanitizeTailor(raw, profile, { headline: "Generative AI Engineer", years: 9 });
+  assert.deepEqual(result.bullets.e0, acme.bullets);
+});
+
+test("the summary must open with the job's title and is dropped if it breaks the rules", () => {
+  const wrongOpener = good();
+  wrongOpener.summary = "Senior Software Engineer with 9+ years of experience.";
+  const a = sanitizeTailor(wrongOpener, profile, { headline: "Generative AI Engineer", years: 9 });
+  assert.equal(a.result.summary, "Generative AI Engineer: Senior Software Engineer with 9+ years of experience.");
+  assert.equal(a.violations.length, 1);
+  const inflated = good();
+  inflated.summary = "Generative AI Engineer with 15 years of experience and a Director background.";
+  const b = sanitizeTailor(inflated, profile, { headline: "Generative AI Engineer", years: 9 });
+  assert.equal(b.result.summary, "");
+});
+
+test("without draft skills the AI may suggest up to 12 known technologies, flagged; anything else is dropped", () => {
+  const bare = normalizeProfile({ name: "A", employers: [{ name: "X", dates: "2020", title: "Engineer" }] });
+  const raw = { summary: "", focus: ["React", "Node.js", "Prompt wizardry"], skillOrder: ["React", "Node.js", "Prompt wizardry", ...Array(20).fill("Python")], titles: { e0: "Software Engineer" }, bullets: { e0: [] } };
+  const { result } = sanitizeTailor(raw, bare, { headline: "", years: 0 });
+  assert.deepEqual(result.skills, ["React", "Node.js", "Python"]);
+  assert.equal(result.ai.skills, true);
+  assert.deepEqual(result.focus, ["React", "Node.js"], "two valid headline skills are enough; the unknown one is dropped");
+});
+
+test("match score is weighted, reads the finished résumé, and lists gaps", () => {
+  const { result } = sanitizeTailor(good(), profile, { headline: "Generative AI Engineer", years: 9 });
+  const m = scoreMatch(
+    [{ term: "Python", required: true }, { term: "Rust", required: true }, { term: "PostgreSQL", required: false }],
+    resumeText(result, "Generative AI Engineer"),
+  );
   assert.deepEqual(m.gaps, ["Rust"]);
   assert.equal(m.score, 60);
 });

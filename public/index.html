@@ -5,12 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Resume Builder</title>
     <meta name="robots" content="noindex" />
-    
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <main class="app">
-      <aside class="panel" aria-label="Job description and analysis">
+      <aside class="panel" aria-label="Draft résumé, job description and analysis">
         <p id="no-server" class="banner">
           This page only works when it is opened through the local server. In Command Prompt, go to the project
           folder and run <code>npm run dev</code> (or double-click <code>start-windows.bat</code>), keep that window
@@ -18,28 +17,66 @@
         </p>
         <h1>Resume Builder</h1>
         <p id="health" class="health" role="status">Checking the server…</p>
-        <p class="hint">Paste a job description. The header, employers, dates and education stay exactly as in the draft; only the summary, skills and bullets are tailored, using only the facts in your facts list (public/facts.js).</p>
 
-        <label for="jd">Job description</label>
-        <textarea id="jd" rows="12" placeholder="Paste the full job description here…"></textarea>
-        <button id="build" type="button">Analyze &amp; build resume</button>
-        <p id="status" role="status" aria-live="polite"></p>
-        <p id="error" class="error" role="alert" hidden></p>
+        <section id="step-resume">
+          <h2 class="step"><span>1</span> Your draft résumé</h2>
+          <div id="upload">
+            <p class="hint">
+              Upload your draft résumé as a PDF. Everything in it stays exactly as written: your name, contact line,
+              companies, dates and school. Claude reads the PDF once; the result is saved only in this browser.
+            </p>
+            <label class="drop" id="drop" for="pdf">
+              <strong>Choose a PDF</strong> or drop it here
+              <input type="file" id="pdf" accept="application/pdf,.pdf" hidden />
+            </label>
+            <p class="hint">No PDF? <button id="manual" type="button" class="link inline">Enter your details by hand</button></p>
+          </div>
+          <div id="editor" hidden>
+            <p class="hint">Check what was read. Fix anything that is wrong, then confirm.</p>
+            <div id="editor-fields"></div>
+            <div class="actions">
+              <button id="save-profile" type="button">Looks right: use this résumé</button>
+              <button id="cancel-edit" type="button" class="secondary">Cancel</button>
+            </div>
+          </div>
+          <div id="resume-summary" hidden>
+            <p id="profile-line"></p>
+            <div class="actions wrap">
+              <button id="edit-profile" type="button" class="secondary">Edit details</button>
+              <button id="replace-profile" type="button" class="secondary">Upload another</button>
+              <button id="forget-profile" type="button" class="secondary">Forget</button>
+            </div>
+          </div>
+          <p id="upload-status" class="status" role="status" aria-live="polite"></p>
+          <p id="upload-error" class="error" role="alert" hidden></p>
+        </section>
+
+        <section id="step-job">
+          <h2 class="step"><span>2</span> The job</h2>
+          <label for="jd">Job description</label>
+          <textarea id="jd" rows="10" placeholder="Paste the full job description here…"></textarea>
+          <button id="build" type="button" disabled>Analyze &amp; build resume</button>
+          <p id="status" class="status" role="status" aria-live="polite"></p>
+          <p id="error" class="error" role="alert" hidden></p>
+        </section>
 
         <section id="analysis" hidden>
           <h2 id="role-title"></h2>
-          <div class="score"><span id="score">0</span><small>% match</small></div>
+          <div class="score"><span id="score">–</span><small>% match</small></div>
           <label for="workflow">Career workflow</label>
           <select id="workflow"></select>
           <h3>Job titles shown</h3>
           <ul id="titles" class="plain"></ul>
-          <p class="hint">Titles are tailored to this job at the same level as your records. Check each one is something you are comfortable sending.</p>
           <h3>Must-haves</h3>
           <ul id="must"></ul>
           <h3>Covered keywords</h3>
           <p id="covered" class="chips"></p>
           <h3>Gaps (not added to the resume)</h3>
           <p id="gaps" class="chips gaps"></p>
+          <div id="ai-box" class="ai-box" hidden>
+            <p><strong id="ai-count"></strong> were written by the AI from general knowledge, not from your draft, so they may be wrong. They are marked “AI draft: verify” on the page. Check each one against what actually happened.</p>
+            <label class="check"><input type="checkbox" id="confirm" /> I have checked every line and it is accurate</label>
+          </div>
           <div class="actions">
             <button id="print" type="button">Download PDF</button>
             <button id="copy" type="button" class="secondary">Copy as text</button>

@@ -25,12 +25,12 @@ body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 syst
 .panel h3 { font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 14px 0 4px; }
 .hint { color: var(--muted); font-size: .85rem; }
 label { display: block; font-weight: 600; margin: 12px 0 4px; }
-textarea, select { width: 100%; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; }
+textarea, select, input[type="text"] { width: 100%; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; }
 button { padding: 9px 14px; border: 0; border-radius: 8px; background: var(--accent); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
 button.secondary { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
 button:disabled { opacity: .5; cursor: wait; }
 #build { margin-top: 10px; width: 100%; }
-#status { min-height: 1.4em; color: var(--muted); font-size: .85rem; }
+.status { min-height: 1.4em; color: var(--muted); font-size: .85rem; }
 #status.busy::before { content: ""; display: inline-block; width: .8em; height: .8em; margin-right: 6px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; vertical-align: -2px; animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { #status.busy::before { animation-duration: 3s; } }
@@ -49,6 +49,22 @@ ul.plain li { margin: 2px 0; }
 .chips span { padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 15%, transparent); }
 .chips.gaps span { background: color-mix(in srgb, #ef4444 15%, transparent); }
 .actions { display: flex; gap: 8px; margin-top: 16px; }
+.actions.wrap { flex-wrap: wrap; margin-top: 8px; }
+.panel h2.step { display: flex; align-items: center; gap: 8px; margin: 18px 0 6px; }
+.panel h2.step span { display: inline-grid; place-items: center; width: 1.5em; height: 1.5em; border-radius: 50%; background: var(--accent); color: #fff; font-size: .8rem; }
+.drop { display: block; margin: 8px 0; padding: 18px 12px; text-align: center; font-weight: 400; border: 2px dashed var(--line); border-radius: 10px; cursor: pointer; }
+.drop:hover, .drop.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+#profile-line { margin: 4px 0 0; font-weight: 600; }
+button.small { padding: 5px 10px; font-size: .85rem; margin: 8px 0; }
+button.link { background: none; color: var(--accent); padding: 0; font-weight: 400; font-size: .8rem; text-decoration: underline; position: absolute; top: -.1em; right: 10px; }
+button.link.inline { position: static; font-size: inherit; }
+.field { margin: 8px 0; font-weight: 400; }
+.field span { display: block; font-size: .8rem; color: var(--muted); margin-bottom: 2px; }
+.card { position: relative; margin: 10px 0; padding: 4px 10px 8px; border: 1px solid var(--line); border-radius: 8px; }
+.card legend { font-size: .8rem; font-weight: 600; padding: 0 4px; }
+.ai-box { margin-top: 14px; padding: 10px 12px; border: 1px solid #f59e0b; border-radius: 8px; background: color-mix(in srgb, #f59e0b 14%, transparent); font-size: .88rem; }
+.ai-box p { margin: 0 0 6px; }
+label.check { display: flex; gap: 8px; align-items: flex-start; font-weight: 600; margin: 6px 0 0; }
 
 /* The resume sheet always renders light, like the printed page. */
 .sheet { background: #fff; color: #111; width: 100%; max-width: 8.5in; min-height: 11in; margin: 0 auto; padding: .6in .7in; box-shadow: 0 2px 14px rgba(0,0,0,.15); font: 10.5pt/1.35 "Lato", Calibri, Arial, sans-serif; }
@@ -63,6 +79,9 @@ ul.plain li { margin: 2px 0; }
 .sheet ul { margin: 2px 0 0; padding-left: 18px; }
 .sheet p { margin: 0; }
 .sheet .editable:focus { outline: 2px dashed #93c5fd; outline-offset: 2px; }
+.sheet .empty { color: #666; text-align: center; margin-top: 3in; }
+.sheet .ai-badge { margin-left: 6px; padding: 0 5px; border-radius: 4px; background: #fef3c7; color: #92400e; font-size: 7.5pt; font-weight: 600; white-space: nowrap; user-select: none; }
+.sheet.copying .ai-badge { display: none; }
 
 @media (max-width: 900px) {
   .app { grid-template-columns: 1fr; padding: 16px; }
@@ -77,4 +96,5 @@ ul.plain li { margin: 2px 0; }
   .app { display: block; padding: 0; }
   .sheet { box-shadow: none; max-width: none; min-height: 0; padding: .5in .6in; }
   .sheet .editable:focus { outline: 0; }
+  .sheet .ai-badge { display: none; }
 }

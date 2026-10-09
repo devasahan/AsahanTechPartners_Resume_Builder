@@ -1,15 +1,23 @@
 # AsahanTechPartners Resume Builder
 
-Paste a job description and get a one-page resume tailored to it, plus a match score and keyword gaps.
-The header, employers, dates and education are locked (`public/locked.js`); the summary, skills and bullets are
-written by Claude using only the facts in `public/facts.js`. Any bullet with a number or tool that is not in that
-file is dropped. Add real facts there to get more content.
+Upload your draft résumé (PDF), paste a job description, and get a one-page résumé tailored to that job, with a match
+score and the keywords you're missing. Runs on your own computer; your key and résumé stay with you.
 
-For each job, the builder also suggests a job title per company and opens the summary with the job's own title
-(for example "Generative AI Engineer"). Suggested titles stay at the same level as the title on your records
-(`recordTitle` in `public/locked.js`), never add Senior, Lead or Principal, and use AI wording only where that
-company's facts show AI work. The side panel lists each title next to the one on record, so you can decide what to
-send. You can also edit any title in the preview.
+## How it works
+
+1. **Upload your draft résumé.** Claude reads the PDF once and the page shows what it found, so you can fix anything.
+   Whatever is in the draft stays exactly as written: your name, contact line, companies, dates and school.
+   The result is saved only in this browser (use **Forget** to remove it).
+2. **Paste a job description.** The builder works out what the job needs, picks the best-fit career workflow, and writes:
+   a headline under your name (the job's title plus three key skills), a summary that opens with the job's title,
+   a job title for each company, your skills, and bullets for each company.
+3. **Check, then download.** Bullets already in your draft are rewritten to fit the job using only what they say: no new
+   numbers or tools. If a company has no bullets, the AI drafts a few from general knowledge of that company and role.
+   Those are guesses, so they are marked **AI draft: verify**, can't contain numbers, named tools or leadership claims,
+   and you must tick a box confirming every line is accurate before **Download PDF** is enabled.
+   Everything on the page can be edited by clicking it.
+
+The more your draft contains (titles, bullets, skills), the better and more truthful the result.
 
 ## First-time setup (Windows)
 
@@ -40,8 +48,8 @@ http://localhost:3000, and the window shows whether the key was found:
 **Keep that window open while you use the page.** Closing it (or pressing Ctrl+C) stops the server.
 
 Use **Download PDF** (browser print, Letter, one page). The key stays in the server window and never reaches the
-browser, and the server only accepts connections from this computer. To change the model, set `RESUME_MODEL` in
-`.env` and restart.
+browser, and the server only accepts connections from this computer. Your PDF is sent to the Claude API to be read,
+and nowhere else. To change the model, set `RESUME_MODEL` in `.env` and restart.
 
 ## Troubleshooting
 
@@ -51,11 +59,15 @@ browser, and the server only accepts connections from this computer. To change t
 | A yellow box saying the page must be opened through the local server | You opened `index.html` directly. Start the server and go to http://localhost:3000. |
 | "No API key found" | Create `.env` as above, paste the key, save, and restart the server. |
 | "The API key was rejected" | The key was deleted or mistyped. Create a new key, put it in `.env`, and restart. |
+| "That doesn't look like a résumé" | The PDF has no name, jobs or school in it, or can't be read. Try another PDF, or click "Enter your details by hand". |
 | "port 3000 was busy" in the window | Another copy is running in a different window. Close it, or use the address this window prints. |
 
 ## Development
 
 ```bash
-npm test                       # guardrails, locked data, .env parsing, API error handling
+npm test                       # guardrails, profile handling, API (against a fake Claude), .env parsing
 npm run dev -- --no-open       # start without opening a browser tab
 ```
+
+Code map: `public/` is the page (`guard.js` holds the rules every generated line must pass, `profile.js` the résumé
+model, `vocabulary.js` the list of named tools used by those rules); `scripts/` is the local server and the API.
