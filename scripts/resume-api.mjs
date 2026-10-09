@@ -1,9 +1,10 @@
 /**
- * Resume builder API, mounted by dev-server.mjs.
+ * Resume builder API, mounted by server.mjs.
+ *   GET  /api/health                               -> { ok, model, keySet }
  *   POST /api/analyze  { jd }                      -> analysis + match score
  *   POST /api/tailor   { analysis, workflow }      -> summary, skills, bullets
- * The Anthropic key (ANTHROPIC_API_KEY, or an `ant auth login` profile) stays
- * on the server and never reaches the browser.
+ * The Anthropic key (ANTHROPIC_API_KEY, usually from .env) stays on the server
+ * and never reaches the browser.
  */
 import Anthropic from "@anthropic-ai/sdk";
 import { FACTS, PROFILE, SKILLS } from "../public/facts.js";
@@ -11,11 +12,25 @@ import { sanitizeTailor, scoreMatch } from "../public/guard.js";
 import { LOCKED } from "../public/locked.js";
 import { ROLE_TYPES, WORKFLOWS } from "../public/workflows.js";
 
-const MODEL = process.env.RESUME_MODEL || "claude-opus-5-5";
+const DEFAULT_MODEL = "claude-opus-5-5";
 const MAX_BODY = 100_000;
 
+/** Read at call time, so settings loaded from .env after import still apply. */
+export const config = () => ({
+  model: process.env.RESUME_MODEL || DEFAULT_MODEL,
+  keySet: Boolean(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN),
+});
+
+export const NO_KEY =
+  "No API key found. Copy .env.example to .env, paste your key after ANTHROPIC_API_KEY=, then restart the server.";
+
 let client;
-const getClient = () => (client ??= new Anthropic());
+function getClient() {
+  // The SDK only notices a missing key once a request is sent, so check first.
+  if (!config().keySet) throw new HttpError(500, NO_KEY);
+  // One retry and a 3-minute cap per attempt, so a dead network fails in minutes rather than half an hour.
+  return (client ??= new Anthropic({ timeout: 180_000, maxRetries: 1 }));
+}
 
 const str = { type: "string" };
 const strList = { type: "array", items: str };
@@ -60,7 +75,7 @@ const TAILOR_SCHEMA = {
 
 async function ask(system, user, schema) {
   const response = await getClient().messages.create({
-    model: MODEL,
+    model: config().model,
     max_tokens: 16000,
     system,
     output_config: { effort: "medium", format: { type: "json_schema", schema } },
@@ -139,27 +154,63 @@ function readJson(req) {
   });
 }
 
-const ROUTES = { "/api/analyze": analyze, "/api/tailor": tailor };
+/** Turn any failure into a status and a message the page can show as-is. */
+export function describeError(error, model = config().model) {
+  if (error instanceof HttpError) return { status: error.status, message: error.message };
+  if (error instanceof Anthropic.AuthenticationError)
+    return {
+      status: 401,
+      message:
+        "The API key was rejected: it may have been deleted or mistyped. Create a new key in the Claude Console, put it in .env, and restart the server.",
+    };
+  if (error instanceof Anthropic.PermissionDeniedError)
+    return { status: 403, message: `This API key isn't allowed to make this request: ${error.message}` };
+  if (error instanceof Anthropic.NotFoundError)
+    return { status: 404, message: `Model "${model}" was not found. Check RESUME_MODEL in .env.` };
+  if (error instanceof Anthropic.RateLimitError)
+    return { status: 429, message: "The Claude API is rate limiting this key. Wait a minute and try again." };
+  if (error instanceof Anthropic.APIConnectionTimeoutError)
+    return { status: 504, message: "The Claude API took too long to answer. Try again." };
+  if (error instanceof Anthropic.APIConnectionError)
+    return { status: 502, message: "Can't reach the Claude API. Check this computer's internet connection." };
+  if (error instanceof Anthropic.APIError) return { status: 502, message: `Claude API error: ${error.message}` };
+  return { status: 500, message: "Something went wrong on the server. The window running it shows the details." };
+}
+
+const ROUTES = {
+  "GET /api/health": async () => ({ ok: true, ...config() }),
+  "POST /api/analyze": analyze,
+  "POST /api/tailor": tailor,
+};
+const PATHS = new Set(Object.keys(ROUTES).map((key) => key.split(" ")[1]));
+
+// Only this computer's own page may call the API: blocks other websites (and
+// DNS-rebinding tricks) from spending the key's credits through the browser.
+const LOCAL_HOST = /^(localhost|127\.0\.0\.1)(:\d+)?$/;
+
+const log = (message) => console.log(`  ${new Date().toLocaleTimeString()}  ${message}`);
 
 /** Returns true when the request was an API route and has been handled. */
 export async function handleApi(req, res, pathname) {
-  const route = ROUTES[pathname];
-  if (!route) return false;
+  if (!PATHS.has(pathname)) return false;
   const send = (status, body) =>
     res.writeHead(status, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }).end(JSON.stringify(body));
-  if (req.method !== "POST") return send(405, { error: "Use POST." }), true;
+  const route = ROUTES[`${req.method} ${pathname}`];
+  if (!route) return send(405, { error: "Method not allowed." }), true;
+  if (!LOCAL_HOST.test(req.headers.host ?? "")) return send(403, { error: "Open the page at http://localhost." }), true;
+  if (req.method === "POST" && !String(req.headers["content-type"]).startsWith("application/json"))
+    return send(415, { error: "Send JSON." }), true;
+
+  const started = Date.now();
+  const seconds = () => `${((Date.now() - started) / 1000).toFixed(1)}s`;
   try {
-    send(200, await route(await readJson(req)));
+    send(200, await route(req.method === "POST" ? await readJson(req) : {}));
+    if (req.method === "POST") log(`${pathname} ok (${seconds()})`);
   } catch (error) {
-    if (error instanceof HttpError) send(error.status, { error: error.message });
-    else if (error instanceof Anthropic.AuthenticationError || /api key|auth/i.test(error?.message ?? ""))
-      send(500, { error: "No Anthropic credentials. Set ANTHROPIC_API_KEY and restart `npm run dev`." });
-    else if (error instanceof Anthropic.RateLimitError) send(429, { error: "Rate limited. Try again shortly." });
-    else if (error instanceof Anthropic.APIError) send(502, { error: `Anthropic API error ${error.status}: ${error.message}` });
-    else {
-      console.error(error);
-      send(500, { error: "Something went wrong." });
-    }
+    const { status, message } = describeError(error);
+    if (status === 500 && !(error instanceof HttpError)) console.error(error);
+    log(`${pathname} failed (${seconds()}): ${message}`);
+    send(status, { error: message });
   }
   return true;
 }

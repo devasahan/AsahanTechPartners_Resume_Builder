@@ -11,13 +11,20 @@
   <body>
     <main class="app">
       <aside class="panel" aria-label="Job description and analysis">
+        <p id="no-server" class="banner">
+          This page only works when it is opened through the local server. In Command Prompt, go to the project
+          folder and run <code>npm run dev</code> (or double-click <code>start-windows.bat</code>), keep that window
+          open, then go to <a href="http://localhost:3000">http://localhost:3000</a>.
+        </p>
         <h1>Resume Builder</h1>
+        <p id="health" class="health" role="status">Checking the server…</p>
         <p class="hint">Paste a job description. The header, employers, dates and education stay exactly as in the draft; only the summary, skills and bullets are tailored, using facts from the portfolio.</p>
 
         <label for="jd">Job description</label>
         <textarea id="jd" rows="12" placeholder="Paste the full job description here…"></textarea>
         <button id="build" type="button">Analyze &amp; build resume</button>
         <p id="status" role="status" aria-live="polite"></p>
+        <p id="error" class="error" role="alert" hidden></p>
 
         <section id="analysis" hidden>
           <h2 id="role-title"></h2>

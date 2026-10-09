@@ -3,6 +3,12 @@ import { LOCKED } from "./locked.js";
 const $ = (id) => document.getElementById(id);
 const state = { analysis: null, tailored: null };
 
+// The script loaded, so the page came from the server: drop the "open it through the server" banner.
+$("no-server")?.remove();
+
+const NO_SERVER =
+  "Can't reach the local server. Is the Command Prompt window running npm run dev still open? Start it again, then reload this page.";
+
 function el(tag, className, text) {
   const node = document.createElement(tag);
   if (className) node.className = className;
@@ -82,19 +88,60 @@ function renderMatch(match) {
   chips($("gaps"), match.gaps);
 }
 
+async function checkHealth() {
+  let health;
+  try {
+    health = await (await fetch("/api/health")).json();
+  } catch {
+    health = { error: "Can't reach the local server." };
+  }
+  const ready = health.ok && health.keySet;
+  $("health").textContent = ready
+    ? `Ready · ${health.model}`
+    : (health.error ?? "No API key found: add it to the .env file, then restart the server.");
+  $("health").className = `health ${ready ? "ok" : "bad"}`;
+}
+
+let timer;
+/** Show what is running, with a spinner and the seconds elapsed. */
+function progress(label) {
+  clearInterval(timer);
+  const started = Date.now();
+  const tick = () => ($("status").textContent = `${label} ${Math.round((Date.now() - started) / 1000)}s`);
+  tick();
+  timer = setInterval(tick, 1000);
+  $("status").classList.add("busy");
+}
+
+function done(text) {
+  clearInterval(timer);
+  $("status").classList.remove("busy");
+  $("status").textContent = text;
+}
+
+function showError(message) {
+  $("error").textContent = message;
+  $("error").hidden = !message;
+}
+
 async function post(path, body) {
-  const res = await fetch(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  let res;
+  try {
+    res = await fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    throw new Error(NO_SERVER);
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
   return data;
 }
 
 async function tailor() {
-  $("status").textContent = "Writing tailored resume…";
+  progress("Writing the tailored resume…");
   const t = await post("/api/tailor", { analysis: state.analysis, workflow: $("workflow").value });
   state.tailored = t;
   renderMatch(t.match);
@@ -102,15 +149,17 @@ async function tailor() {
     ? `${t.dropped} generated line(s) were removed because they used details not in the facts bank.`
     : "";
   renderResume();
-  $("status").textContent = `Done. Workflow: ${t.workflow}.`;
+  done(`Done. Workflow: ${t.workflow}.`);
 }
 
 async function run(fn) {
   $("build").disabled = true;
+  showError("");
   try {
     await fn();
   } catch (error) {
-    $("status").textContent = error.message;
+    done("");
+    showError(error.message);
   } finally {
     $("build").disabled = false;
   }
@@ -118,7 +167,7 @@ async function run(fn) {
 
 $("build").addEventListener("click", () =>
   run(async () => {
-    $("status").textContent = "Analyzing job description…";
+    progress("Analyzing the job description…");
     const data = await post("/api/analyze", { jd: $("jd").value });
     renderAnalysis(data, data.workflows);
     renderMatch(data.match);
@@ -133,10 +182,11 @@ $("copy").addEventListener("click", async () => {
   const text = $("resume").innerText;
   try {
     await navigator.clipboard.writeText(text);
-    $("status").textContent = "Copied.";
+    done("Copied.");
   } catch {
-    $("status").textContent = "Copy failed; select the resume text manually.";
+    done("Copy failed; select the resume text manually.");
   }
 });
 
 renderResume();
+checkHealth();

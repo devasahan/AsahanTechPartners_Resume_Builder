@@ -1,12 +1,21 @@
-/** Local server: serves public/ on http://localhost:3000 and mounts the /api routes. */
+/**
+ * Local server: serves public/ and the /api routes on http://localhost:3000
+ * (or the next free port), opens the browser, and says whether an API key was
+ * found. It only accepts connections from this computer.
+ *
+ * Options: npm run dev -- --no-open   don't open a browser tab
+ */
+import { exec } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { extname, join, normalize, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { handleApi } from "./resume-api.mjs";
+import { loadEnv } from "./load-env.mjs";
+import { config, handleApi, NO_KEY } from "./resume-api.mjs";
 
+const fromEnvFile = loadEnv();
 const PUBLIC = fileURLToPath(new URL("../public", import.meta.url));
-const PORT = Number(process.env.PORT) || 3000;
+const START_PORT = Number(process.env.PORT) || 3000;
 const TYPES = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
@@ -14,7 +23,7 @@ const TYPES = {
   ".svg": "image/svg+xml",
 };
 
-createServer(async (req, res) => {
+const server = createServer(async (req, res) => {
   const { pathname: raw } = new URL(req.url, "http://localhost");
   let pathname;
   try {
@@ -32,4 +41,41 @@ createServer(async (req, res) => {
   } catch {
     res.writeHead(404).end("Not found");
   }
-}).listen(PORT, () => console.log(`Resume builder running at http://localhost:${PORT}`));
+});
+
+function openBrowser(address) {
+  if (process.argv.includes("--no-open")) return;
+  const command =
+    process.platform === "win32"
+      ? `start "" "${address}"`
+      : process.platform === "darwin"
+        ? `open "${address}"`
+        : `xdg-open "${address}"`;
+  exec(command, () => {});
+}
+
+// Try the next port when one is taken, e.g. by a copy still running in another window.
+function listen(port) {
+  const onError = (error) => {
+    if (error.code === "EADDRINUSE" && port < START_PORT + 9) return listen(port + 1);
+    console.error(`\n  Could not start the server: ${error.message}\n`);
+    process.exit(1);
+  };
+  server.once("error", onError);
+  server.listen(port, "127.0.0.1", () => server.off("error", onError));
+}
+
+server.once("listening", () => {
+  const port = server.address().port;
+  const address = `http://localhost:${port}`;
+  const { model, keySet } = config();
+  const source = fromEnvFile.has("ANTHROPIC_API_KEY") ? ".env file" : "environment";
+  console.log(`\n  Resume builder running at ${address}`);
+  if (port !== START_PORT) console.log(`  (port ${START_PORT} was busy: is another copy running in a different window?)`);
+  console.log(`  Model:   ${model}`);
+  console.log(keySet ? `  API key: found (${source})` : `  API key: MISSING. ${NO_KEY}`);
+  console.log("\n  Keep this window open while you use the page. Press Ctrl+C to stop.\n");
+  openBrowser(address);
+});
+
+listen(START_PORT);

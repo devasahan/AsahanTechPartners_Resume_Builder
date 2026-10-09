@@ -31,6 +31,15 @@ button.secondary { background: transparent; color: var(--accent); border: 1px so
 button:disabled { opacity: .5; cursor: wait; }
 #build { margin-top: 10px; width: 100%; }
 #status { min-height: 1.4em; color: var(--muted); font-size: .85rem; }
+#status.busy::before { content: ""; display: inline-block; width: .8em; height: .8em; margin-right: 6px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; vertical-align: -2px; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { #status.busy::before { animation-duration: 3s; } }
+.error { margin: 4px 0 0; padding: 10px 12px; border: 1px solid #ef4444; border-radius: 8px; background: color-mix(in srgb, #ef4444 12%, transparent); font-size: .9rem; }
+.banner { margin: 0 0 12px; padding: 10px 12px; border: 1px solid #f59e0b; border-radius: 8px; background: #fef3c7; color: #78350f; font-size: .9rem; }
+.banner a { color: inherit; }
+.health { display: inline-block; margin: 0 0 6px; padding: 2px 10px; border-radius: 999px; font-size: .8rem; background: color-mix(in srgb, var(--muted) 15%, transparent); }
+.health.ok { background: color-mix(in srgb, #16a34a 20%, transparent); }
+.health.bad { background: color-mix(in srgb, #ef4444 20%, transparent); }
 .score { font-size: 2.2rem; font-weight: 700; color: var(--accent); }
 .score small { font-size: .9rem; margin-left: 4px; color: var(--muted); }
 #must { margin: 0; padding-left: 18px; font-size: .88rem; }
